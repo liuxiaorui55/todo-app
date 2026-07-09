@@ -420,15 +420,20 @@
 </head>
 <body>
 
+<!-- 背景氛围光晕，通过 CSS 动画浮动，营造沉浸式视觉效果 -->
 <div class="bg-orb bg-orb--1"></div>
 <div class="bg-orb bg-orb--2"></div>
 <div class="bg-orb bg-orb--3"></div>
 
+<!-- 全局 Toast 提示条，固定底部居中，自动消失 -->
 <div class="toast" id="toast" style="display:none"></div>
+<!-- 模态弹窗容器，动态注入确认对话框 HTML -->
 <div id="modalContainer"></div>
+<!-- 隐藏的文件选择器，供自定义主题上传背景图片使用 -->
 <input type="file" id="customImageInput" accept="image/*" style="display:none">
 
 <main class="app">
+  <!-- 顶部标题栏，包含应用名称和搜索/导出/导入操作按钮 -->
   <div class="header">
     <h1 class="title"><span class="title-emoji">✨</span>待办清单</h1>
     <div class="header-actions">
@@ -438,10 +443,12 @@
     </div>
   </div>
 
+  <!-- 搜索输入区，默认收起，点击搜索按钮展开，使用 max-height 动画实现平滑过渡 -->
   <div class="search-wrap" id="searchWrap">
     <input class="search-input" id="searchInput" type="text" placeholder="搜索任务..." autocomplete="off">
   </div>
 
+  <!-- 进度条区域，显示完成数量/总数及百分比进度条 -->
   <div class="progress-section">
     <div class="progress-stats">
       <span class="progress-label"><span style="background:linear-gradient(90deg,#6ea8fe 50%,#e891b0 50%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">❤</span> 完成进度</span>
@@ -450,11 +457,13 @@
     <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
   </div>
 
+  <!-- 任务输入行：文本输入框 + 添加按钮 -->
   <div class="input-row">
     <input class="input" id="todoInput" type="text" placeholder="添加一个新任务..." maxlength="200" autocomplete="off">
     <button class="btn-add" id="btnAdd" title="添加任务">＋</button>
   </div>
 
+  <!-- 选项面板：优先级、分类、截止日期、主题切换 -->
   <div class="options-panel" id="optionsPanel">
     <div class="opt-row">
       <span class="opt-label">⭐ 优先级</span>
@@ -490,12 +499,14 @@
     </div>
   </div>
 
+  <!-- 状态筛选标签页：全部/进行中/已完成 -->
   <div class="tabs">
     <button class="tab active" data-filter="all">📋 全部</button>
     <button class="tab" data-filter="active">🔄 进行中</button>
     <button class="tab" data-filter="done">✅ 已完成</button>
   </div>
 
+  <!-- 分类筛选标签：按工作/个人/学习/其他过滤任务 -->
   <div class="category-filters" id="categoryFilters">
     <button class="cat-chip active" data-cat="">全部标签</button>
     <button class="cat-chip" data-cat="work">💼 工作</button>
@@ -504,14 +515,17 @@
     <button class="cat-chip" data-cat="other">🎯 其他</button>
   </div>
 
+  <!-- 任务列表，由 JS 动态渲染，支持拖拽排序、内联编辑 -->
   <ul class="todo-list" id="todoList"></ul>
 
+  <!-- 底部栏：剩余任务计数 + 清空已完成按钮 -->
   <div class="footer">
     <span class="remaining" id="remainingLabel"></span>
     <button class="btn-clear" id="btnClear">🗑 清空已完成</button>
   </div>
 </main>
 
+<!-- 隐藏的文件选择器，供 JSON 导入功能触发文件选择对话框 -->
 <input type="file" id="fileImport" accept=".json" style="display:none">
 
 <script>
@@ -538,23 +552,30 @@
   const $toast = document.getElementById('toast');
   const $modalContainer = document.getElementById('modalContainer');
 
-  let todos = [];
-  let filter = 'all';
-  let categoryFilter = '';
-  let searchQuery = '';
-  let addOptions = { priority: 'medium', category: 'personal' };
-  let toastTimer = null;
+  // ========== 应用状态 ==========
+  let todos = [];                   // 任务数据数组，持久化到 localStorage
+  let filter = 'all';              // 当前状态筛选：'all' | 'active' | 'done'
+  let categoryFilter = '';         // 当前分类筛选：'' 表示不筛选
+  let searchQuery = '';            // 搜索关键词
+  let addOptions = { priority: 'medium', category: 'personal' }; // 新增任务时的默认选项
+  let toastTimer = null;           // Toast 自动消失的定时器句柄
 
+  // 全局轻提示，底部居中显示，约 2 秒后自动消失
   function toast(msg) {
     clearTimeout(toastTimer);
     $toast.textContent = msg; $toast.style.display = '';
+    // 先重置动画再触发回流，确保动画每次都能从头播放
     $toast.style.animation = 'none'; void $toast.offsetHeight;
     $toast.style.animation = 'toastIn 0.25s ease, toastOut 0.25s ease 1.8s forwards';
+    // 动画总时长约 2.05s，延迟 2.1s 隐藏元素确保动画播放完毕
     toastTimer = setTimeout(() => { $toast.style.display = 'none'; }, 2100);
   }
 
+  // 通用确认弹窗，返回 Promise<boolean>，支持异步等待用户选择
+  // 点击遮罩层、Esc 键、取消按钮均视为取消（resolve false）
   function showConfirm({ icon, title, text, confirmText, onConfirm }) {
     return new Promise(resolve => {
+      // 1. 动态注入弹窗 HTML
       $modalContainer.innerHTML = `<div class="modal-overlay"><div class="modal-card">
         <div class="modal-icon">${icon||'⚠️'}</div>
         <div class="modal-title">${title}</div>
@@ -565,68 +586,87 @@
         </div></div></div>`;
       const $overlay = $modalContainer.querySelector('.modal-overlay');
       const close = r => { $modalContainer.innerHTML = ''; resolve(r); };
+      // 2. 绑定关闭事件
       $modalContainer.querySelector('#modalCancel').addEventListener('click', () => close(false));
       $modalContainer.querySelector('#modalConfirm').addEventListener('click', () => close(true));
+      // 点击遮罩层外部区域关闭（仅当点击目标为遮罩本身，不冒泡到内部卡片）
       $overlay.addEventListener('click', e => { if(e.target===$overlay) close(false); });
+      // 按 Esc 键关闭，使用具名函数以便移除监听器防止内存泄漏
       document.addEventListener('keydown', function esc(e) { if(e.key==='Escape'){document.removeEventListener('keydown',esc);close(false);} });
     });
   }
 
+  // 数据迁移：为旧版本数据补全缺失字段，保证向后兼容
+  // 旧版本可能没有 id/priority/category/order 字段
   function migrate(t) {
-    if(!t.id) t.id = Date.now() + Math.random();
+    if(!t.id) t.id = Date.now() + Math.random(); // 为无 ID 的旧数据生成唯一标识
     if(!t.priority) t.priority = 'medium';
     if(!t.category) t.category = '';
-    if(t.order===undefined) t.order = 0;
+    if(t.order===undefined) t.order = 0; // 未设置排序位置时置为 0
   }
 
+  // 从 localStorage 加载任务数据，加载后自动迁移旧格式数据
   function loadTodos() {
     try { const r = localStorage.getItem('cool-todos-pro'); todos = r ? JSON.parse(r) : []; todos.forEach(migrate); }
-    catch { todos = []; }
+    catch { todos = []; } // JSON 解析失败时降级为空数组，防止应用崩溃
   }
 
   function saveTodos() { localStorage.setItem('cool-todos-pro', JSON.stringify(todos)); }
 
+  // 优先级权重映射，数值越小优先级越高，用于排序比较
   function priorityWeight(p) { return p==='high'?0:p==='medium'?1:2; }
 
+  // 多级排序：过期任务 > 未过期 > 进行中 > 已完成 > 按优先级 > 按拖拽顺序
+  // 排序优先级：1.过期待办置顶 2.未完成在前 3.高优先级在前 4.保持用户拖拽顺序
   function sortTodos() {
-    const today = new Date(); today.setHours(0,0,0,0);
+    const today = new Date(); today.setHours(0,0,0,0); // 获取当天零点，用于日期比较
     todos.sort((a,b) => {
+      // 判断是否已过期：有截止日期且截止日期早于今天
       const aOver = a.dueDate && new Date(a.dueDate+'T00:00:00')<today?1:0;
       const bOver = b.dueDate && new Date(b.dueDate+'T00:00:00')<today?1:0;
-      if(aOver!==bOver) return bOver-aOver;
-      if(a.done!==b.done) return a.done?1:-1;
+      if(aOver!==bOver) return bOver-aOver; // 过期的排前面
+      if(a.done!==b.done) return a.done?1:-1; // 已完成的排后面
       const pw = priorityWeight(a.priority)-priorityWeight(b.priority);
-      return pw!==0?pw:a.order-b.order;
+      return pw!==0?pw:a.order-b.order; // 同级按用户拖拽顺序排列
     });
   }
 
+  // 根据截止日期计算显示文本和样式类名，供渲染时展示到期提醒
+  // 返回 null 表示无截止日期；cls 用于 CSS 高亮（overdue 红色闪烁 / soon 黄色）
   function getDueInfo(dueDate) {
     if(!dueDate) return null;
     const now=new Date(),due=new Date(dueDate+'T00:00:00'),today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-    const diff=Math.floor((due-today)/86400000);
-    if(diff<0) return {text:'已过期',cls:'overdue'};
-    if(diff===0) return {text:'今天截止',cls:'soon'};
-    if(diff===1) return {text:'明天截止',cls:'soon'};
-    if(diff<=3) return {text:`${diff}天后截止`,cls:''};
-    return {text:`${diff}天后`,cls:''};
+    const diff=Math.floor((due-today)/86400000); // 距今天的天数差
+    if(diff<0) return {text:'已过期',cls:'overdue'};   // 已过期，红色脉冲动画
+    if(diff===0) return {text:'今天截止',cls:'soon'};  // 今天截止，黄色高亮
+    if(diff===1) return {text:'明天截止',cls:'soon'};  // 明天截止，黄色高亮
+    if(diff<=3) return {text:`${diff}天后截止`,cls:''}; // 3 天内，普通显示
+    return {text:`${diff}天后`,cls:''};                 // 超过 3 天，简略显示
   }
 
+  // 渲染核心：排序 -> 筛选 -> 更新进度 -> 渲染列表，每次状态变更后调用
   function render() {
+    // 1. 排序所有任务
     sortTodos();
+    // 2. 按状态筛选（进行中/已完成）
     let filtered = todos;
     if(filter==='active') filtered=filtered.filter(t=>!t.done);
     else if(filter==='done') filtered=filtered.filter(t=>t.done);
+    // 3. 按分类筛选
     if(categoryFilter) filtered=filtered.filter(t=>t.category===categoryFilter);
+    // 4. 按搜索关键词筛选（不区分大小写）
     if(searchQuery){ const q=searchQuery.toLowerCase(); filtered=filtered.filter(t=>t.text.toLowerCase().includes(q)); }
 
+    // 5. 更新顶部进度统计
     const total=todos.length, done=todos.filter(t=>t.done).length;
     const pct=total===0?0:Math.round(done/total*100);
     $doneCount.textContent=done; $totalCount.textContent=total;
     $progressFill.style.width=pct+'%';
     const remaining=total-done;
     $remainingLabel.textContent=remaining===0?'🎉 全部完成！':`📌 还有 ${remaining} 项待完成`;
-    $btnClear.style.display=done===0?'none':'';
+    $btnClear.style.display=done===0?'none':''; // 无已完成任务时隐藏清空按钮
 
+    // 6. 空状态展示（根据当前筛选标签显示不同的空状态文案）
     if(filtered.length===0){
       const icons={all:'📝',active:'💪',done:'🏆'};
       const msgs={all:'还没有任务，添加一个吧',active:'所有任务都完成啦',done:'还没有已完成的任务'};
@@ -634,6 +674,7 @@
       return;
     }
 
+    // 7. 渲染任务列表 HTML
     const catNames={work:'工作',personal:'个人',study:'学习'};
     const priLabels={high:'高',medium:'中',low:'低'};
     $list.innerHTML = filtered.map(t => {
@@ -652,33 +693,43 @@
     }).join('');
   }
 
+  // XSS 防护：将用户输入中的 HTML 特殊字符转义，防止注入攻击
   function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
+  // 添加新任务：取当前列表最小 order 值减 1，使新任务始终排在最前面
   function addTodo(text){
     const t=text.trim(); if(!t) return;
+    // 计算最小排序值，新任务置顶（order 越小越靠前）
     const minO=todos.length?Math.min(...todos.map(x=>x.order)):0;
     todos.push({id:Date.now(),text:t,done:false,priority:addOptions.priority,category:addOptions.category||'',dueDate:$dueDateInput.value||null,order:minO-1});
     saveTodos(); render();
   }
 
+  // 切换任务完成状态：标记为完成时需确认，取消完成无需确认（防误操作只防"完成"不防"取消"）
   async function toggleTodo(id){ const t=todos.find(x=>x.id===id); if(!t) return; if(!t.done){const ok=await showConfirm({icon:'✅',title:'完成任务',text:`确定已完成 "${t.text}" 吗？`,confirmText:'确认完成'});if(!ok)return;} t.done=!t.done; saveTodos(); render(); }
 
+  // 删除任务：先确认，确认后播放滑出动画，动画结束后再从数据中移除
+  // skipConfirm 用于内部批量操作时跳过确认弹窗
   async function deleteTodo(id,skipConfirm=false){
     const todo=todos.find(t=>t.id===id); if(!todo) return;
+    // 弹窗确认（可跳过，用于如"清空已完成"等批量操作）
     if(!skipConfirm){
       const ok=await showConfirm({icon:'🗑️',title:'确认删除',text:`确定要删除任务 "${todo.text}" 吗？此操作不可撤销。`,confirmText:'确认删除'});
       if(!ok) return;
     }
     const idx=todos.findIndex(t=>t.id===id); if(idx===-1) return;
     const $item=$list.querySelector(`[data-id="${id}"]`);
+    // 若 DOM 元素存在：先播放移除动画，动画结束后再删除数据
+    // 若 DOM 不存在（如被筛选隐藏）：直接从数据中删除
     if($item){$item.classList.add('removing');$item.addEventListener('animationend',function h(){$item.removeEventListener('animationend',h);todos.splice(todos.findIndex(t=>t.id===id),1);saveTodos();render();});}
     else {todos.splice(idx,1);saveTodos();render();}
   }
 
   function updateTodoText(id,newText){ const t=todos.find(x=>x.id===id); if(!t||!newText.trim()) return; t.text=newText.trim(); saveTodos(); render(); }
 
+  // 批量清空已完成任务，需确认弹窗
   async function clearDone(){
-    const dc=todos.filter(t=>t.done).length; if(dc===0) return;
+    const dc=todos.filter(t=>t.done).length; if(dc===0) return; // 无已完成任务时不操作
     const ok=await showConfirm({icon:'🗑️',title:'清空已完成',text:`确定要清空 ${dc} 条已完成的任务吗？此操作不可撤销。`,confirmText:'确认清空'});
     if(!ok) return;
     todos=todos.filter(t=>!t.done); saveTodos(); render(); toast('✅ 已清空已完成任务');
@@ -687,9 +738,11 @@
   function setFilter(f){filter=f;document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.filter===f));render();}
   function setCategoryFilter(c){categoryFilter=c;document.querySelectorAll('.cat-chip').forEach(ch=>ch.classList.toggle('active',ch.dataset.cat===c));render();}
 
+  // 导出为 Excel 文件（依赖 SheetJS xlsx 库），包含序号/内容/状态/优先级/分类/截止日期
   function exportExcel(){
     const priNames={high:'高',medium:'中',low:'低'};
     const catNames={work:'工作',personal:'个人',study:'学习',other:'其他'};
+    // 1. 将任务数据转为二维数组
     const data=todos.map((t,i)=>([
       i+1,
       t.text,
@@ -698,9 +751,10 @@
       catNames[t.category]||(t.category||'无'),
       t.dueDate||''
     ]));
+    // 2. 添加表头
     data.unshift(['序号','任务内容','状态','优先级','分类','截止日期']);
     const ws=XLSX.utils.aoa_to_sheet(data);
-    // 自动列宽
+    // 3. 设置列宽（任务内容列最宽，容纳长文本）
     ws['!cols']=[
       {wch:6},{wch:40},{wch:8},{wch:8},{wch:8},{wch:14}
     ];
@@ -709,6 +763,7 @@
     XLSX.writeFile(wb,`todos-${new Date().toISOString().slice(0,10)}.xlsx`);
     toast('✅ 已导出 Excel！');
   }
+  // 导入 JSON 文件：读取后验证数组格式，对每条数据执行迁移补全字段
   function importJSON(file){
     const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d))throw new Error();d.forEach(migrate);todos=d;saveTodos();render();toast(`✅ 已导入 ${d.length} 条任务`);}catch{toast('❌ 文件格式不正确');}};
     r.readAsText(file);
@@ -721,7 +776,10 @@
   $dueDateInput.addEventListener('change',()=>{$btnClearDate.style.display=$dueDateInput.value?'':'none';});
   $btnClearDate.addEventListener('click',()=>{$dueDateInput.value='';$btnClearDate.style.display='none';});
 
+  // 列表点击事件：通过 data-action 属性区分切换完成/删除操作
+  // 编辑状态下（存在 .todo-edit-input）不处理点击，防止误操作
   $list.addEventListener('click',e=>{if(document.querySelector('.todo-edit-input'))return;const $i=e.target.closest('.todo-item');if(!$i)return;const id=Number($i.dataset.id);if(e.target.dataset.action==='toggle'||e.target.classList.contains('todo-check'))toggleTodo(id);else if(e.target.dataset.action==='delete')deleteTodo(id);});
+  // 双击任务文本进入内联编辑模式，已完成任务不可编辑
   $list.addEventListener('dblclick',e=>{const $t=e.target.closest('.todo-text');if(!$t)return;const $i=e.target.closest('.todo-item'),id=Number($i.dataset.id),todo=todos.find(t=>t.id===id);if(!todo||todo.done)return;const $inp=document.createElement('input');$inp.className='todo-edit-input';$inp.value=todo.text;$t.replaceWith($inp);$inp.focus();$inp.select();const save=()=>{updateTodoText(id,$inp.value);};$inp.addEventListener('blur',save);$inp.addEventListener('keydown',e=>{if(e.key==='Enter')save();if(e.key==='Escape')render();});});
 
   // 拖拽
